@@ -1,83 +1,94 @@
 #!/usr/bin/env python3
-""" This script demonstrates the use of regex for replacing occurrences of certain field values in logs. """
-import re
-from typing import List
+
+""" Filtered logger """
+
+
 import logging
-import mysql.connector
 import os
+import re
+from typing import List, Any, Union
+import mysql.connector
+from mysql.connector.connection import MySQLConnection
+from mysql.connector.pooling import PooledMySQLConnection
+from mysql.connector.connection_cext import CMySQLConnection
+from mysql.connector.cursor_cext import CMySQLCursor
+from mysql.connector.cursor import MySQLCursor
 
 
-class RedactingFormatter(logging.Formatter):
-    """ Formatter class that redacts sensitive information in log records. """
-
-    REDACTION = "***"
-    FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
-    SEPARATOR = ";"
-
-    def __init__(self, fields: List[str]):
-        super(RedactingFormatter, self).__init__(self.FORMAT)
-        self.fields = fields
-
-    def format(self, record: logging.LogRecord) -> str:
-        """ Filters sensitive information from log records. """
-        return filter_datum(self.fields, self.REDACTION,
-                            super().format(record), self.SEPARATOR)
-
-
-PII_FIELDS = ("name", "email", "password", "ssn", "phone")
-
-
-def get_db() -> mysql.connector.connection.MYSQLConnection:
-    """ Establishes a connection to the MySQL database. """
-    db_connect = mysql.connector.connect(
-        user=os.getenv('PERSONAL_DATA_DB_USERNAME', 'root'),
-        password=os.getenv('PERSONAL_DATA_DB_PASSWORD', ''),
-        host=os.getenv('PERSONAL_DATA_DB_HOST', 'localhost'),
-        database=os.getenv('PERSONAL_DATA_DB_NAME')
-    )
-    return db_connect
+PII_FIELDS = ("name", "email", "phone", "ssn", "password")
 
 
 def filter_datum(fields: List[str], redaction: str, message: str,
                  separator: str) -> str:
-    """ Obfuscates sensitive data in log messages using regex. """
-    for field in fields:
-        message = re.sub(f'{field}=(.*?){separator}',
-                         f'{field}={redaction}{separator}', message)
+    """ Replacing """
+
+    for f in fields:
+        message = re.sub(
+            rf"{f}=(.*?)\{separator}",
+            f'{f}={redaction}{separator}',
+            message)
     return message
 
 
+class RedactingFormatter(logging.Formatter):
+    """ RedactingFormatter class. """
+
+    REDACTION: str = "***"
+    FORMAT: str = "[HOLBERTON] %(name)s %(levelname)s %\
+(asctime)-15s: %(message)s"
+    SEPARATOR: str = ";"
+
+    def __init__(self, fields: List[str]) -> None:
+        """ Initialization of class """
+
+        self.fields: List[str] = fields
+        super(RedactingFormatter, self).__init__(self.FORMAT)
+
+    def format(self, record: logging.LogRecord) -> str:
+        """ Formating method """
+
+        return filter_datum(self.fields, self.REDACTION,
+                            super().format(record), self.SEPARATOR)
+
+
 def get_logger() -> logging.Logger:
-    """ Configures and returns a logger for user data. """
-    logger = logging.getLogger("user_data")
+    """ A method that implements a logger """
+
+    logger: logging.Logger = logging.getLogger("user_data")
     logger.setLevel(logging.INFO)
     logger.propagate = False
-
-    target_handler = logging.StreamHandler()
-    target_handler.setLevel(logging.INFO)
-
-    formatter = RedactingFormatter(list(PII_FIELDS))
-    target_handler.setFormatter(formatter)
-
-    logger.addHandler(target_handler)
+    handler: logging.StreamHandler = logging.StreamHandler()
+    handler.setFormatter(RedactingFormatter(list(PII_FIELDS)))
+    logger.addHandler(handler)
     return logger
 
 
+def get_db() -> MySQLConnection:
+    """ A method that implements db conectivity """
+
+    psw: str = os.environ.get("PERSONAL_DATA_DB_PASSWORD", "")
+    username: str = os.environ.get('PERSONAL_DATA_DB_USERNAME', "root")
+    host: str = os.environ.get('PERSONAL_DATA_DB_HOST', 'localhost')
+    db_name: str | None = os.environ.get('PERSONAL_DATA_DB_NAME')
+    connection: MySQLConnection = mysql.connector.connect(
+        host=host,
+        database=db_name,
+        user=username,
+        password=psw)
+    return connection
+
+
 def main() -> None:
-    """ Main function to retrieve and log user data from the database. """
-    db = get_db()
-    cursor = db.cursor()
+    """ A method that implements a main function """
+
+    db: PooledMySQLConnection | MySQLConnection | CMySQLConnection = get_db()
+    cursor: Any | MySQLCursor | CMySQLCursor = db.cursor()
     cursor.execute("SELECT * FROM users;")
-
-    headers = [field[0] for field in cursor.description]
-    logger = get_logger()
-
     for row in cursor:
-        info_answer = ''
-        for f, p in zip(row, headers):
-            info_answer += f'{p}={(f)}; '
-        logger.info(info_answer)
-
+        message = f"name={row[0]!r}; email={row[1]!r}; phone={row[2]!r}; " +\
+            f"ssn={row[3]!r}; password={row[4]!r};ip={row[5]!r}; " +\
+            f"last_login={row[6]!r}; user_agent={row[7]!r};"
+        print(message)
     cursor.close()
     db.close()
 

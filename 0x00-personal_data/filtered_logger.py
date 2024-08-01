@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """Filtered Logger Module"""
 import re
-import logging
 from typing import List
-
-
-def filter_datum(fields: List[str],
-                 redaction: str,
-                 message: str,
-                 separator: str) -> str:
-    """ Returns the log message obfuscated """
-    for field in fields:
-        x = f'{field}=[^{separator}]*'
-        y = f'{field}={redaction}'
-        message = re.sub(x, y, message)
-    return message
+import logging
 
 
 class RedactingFormatter(logging.Formatter):
@@ -31,3 +19,15 @@ class RedactingFormatter(logging.Formatter):
         message = super().format(record)
         return filter_datum(self.fields, self.REDACTION, message,
                             self.SEPARATOR)
+
+
+def filter_datum(fields: List[str],
+                 redaction: str,
+                 message: str,
+                 separator: str) -> str:
+    """ Returns the log message obfuscated """
+    for field in fields:
+        x = f'{field}=[^{separator}]*'
+        y = f'{field}={redaction}'
+        message = re.sub(x, y, message)
+    return message

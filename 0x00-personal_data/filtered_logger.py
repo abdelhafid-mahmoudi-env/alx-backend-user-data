@@ -8,7 +8,7 @@ import os
 
 
 class RedactingFormatter(logging.Formatter):
-    """ Redacting Formatter class for obfuscating PII in log records. """
+    """ Formatter class that redacts sensitive information in log records. """
 
     REDACTION = "***"
     FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
@@ -19,7 +19,7 @@ class RedactingFormatter(logging.Formatter):
         self.fields = fields
 
     def format(self, record: logging.LogRecord) -> str:
-        """ Filters sensitive data in log records. """
+        """ Filters sensitive information from log records. """
         return filter_datum(self.fields, self.REDACTION,
                             super().format(record), self.SEPARATOR)
 
@@ -29,13 +29,13 @@ PII_FIELDS = ("name", "email", "password", "ssn", "phone")
 
 def get_db() -> mysql.connector.connection.MYSQLConnection:
     """ Establishes a connection to the MySQL database. """
-    connector = mysql.connector.connect(
+    db_connect = mysql.connector.connect(
         user=os.getenv('PERSONAL_DATA_DB_USERNAME', 'root'),
         password=os.getenv('PERSONAL_DATA_DB_PASSWORD', ''),
         host=os.getenv('PERSONAL_DATA_DB_HOST', 'localhost'),
         database=os.getenv('PERSONAL_DATA_DB_NAME')
     )
-    return connector
+    return db_connect
 
 
 def filter_datum(fields: List[str], redaction: str, message: str,
@@ -49,36 +49,36 @@ def filter_datum(fields: List[str], redaction: str, message: str,
 
 def get_logger() -> logging.Logger:
     """ Configures and returns a logger for user data. """
-    log = logging.getLogger("user_data")
-    log.setLevel(logging.INFO)
-    log.propagate = False
+    logger = logging.getLogger("user_data")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
-    target = logging.StreamHandler()
-    target.setLevel(logging.INFO)
+    target_handler = logging.StreamHandler()
+    target_handler.setLevel(logging.INFO)
 
-    fm = RedactingFormatter(list(PII_FIELDS))
-    target.setFormatter(fm)
+    formatter = RedactingFormatter(list(PII_FIELDS))
+    target_handler.setFormatter(formatter)
 
-    log.addHandler(target)
-    return log
+    logger.addHandler(target_handler)
+    return logger
 
 
 def main() -> None:
     """ Main function to retrieve and log user data from the database. """
     db = get_db()
-    pointer = db.cursor()
-    pointer.execute("SELECT * FROM users;")
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users;")
 
-    headings = [field[0] for field in pointer.description]
-    log = get_logger()
+    headers = [field[0] for field in cursor.description]
+    logger = get_logger()
 
-    for row in pointer:
+    for row in cursor:
         info_answer = ''
-        for f, p in zip(row, headings):
+        for f, p in zip(row, headers):
             info_answer += f'{p}={(f)}; '
-        log.info(info_answer)
+        logger.info(info_answer)
 
-    pointer.close()
+    cursor.close()
     db.close()
 
 

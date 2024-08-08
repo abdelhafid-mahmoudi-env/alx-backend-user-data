@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-""" Authentication module.
-"""
 from flask import request
 from typing import List, TypeVar
-import fnmatch
 
+User = TypeVar('User')
 
 class Auth:
     """ Authentication class.
@@ -19,7 +17,6 @@ class Auth:
             return True
 
         for excluded_path in excluded_paths:
-            # Use fnmatch to match path patterns
             if fnmatch.fnmatch(path, excluded_path):
                 return False
 
@@ -28,11 +25,12 @@ class Auth:
     def authorization_header(self, request=None) -> str:
         """ Retrieves the authorization header from the request.
         """
-        if request is not None:
-            return request.headers.get('Authorization', None)
-        return None
+        if request is None:
+            return None
 
-    def current_user(self, request=None) -> TypeVar('User'):
+        return request.headers.get('Authorization', None)
+
+    def current_user(self, request=None) -> User:
         """ Returns the current user based on the request.
         """
         return None

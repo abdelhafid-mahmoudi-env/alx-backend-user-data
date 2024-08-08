@@ -19,6 +19,7 @@ class Auth:
             return True
 
         for excluded_path in excluded_paths:
+            # Use fnmatch to match path patterns
             if fnmatch.fnmatch(path, excluded_path):
                 return False
 
